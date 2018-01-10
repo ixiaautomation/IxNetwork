@@ -2,8 +2,9 @@ import re, time
 from IxNetRestApi import IxNetRestApiException
 
 class QuickTest(object):
-    def __init__(self, ixnObj):
+    def __init__(self, ixnObj, fileMgmtObj):
         self.ixnObj = ixnObj
+        self.fileMgmtObj = fileMgmtObj
 
     def getAllQuickTestHandles(self):
         """
@@ -305,9 +306,9 @@ class QuickTest(object):
             # Backslash indicates the results resides on a Windows OS.
             if '\\' in resultsPath:
                 if bool(re.match('[a-z]:.*', copyToPath, re.I)):
-                    self.ixnObj.copyFileWindowsToLocalWindows(resultsPath+'\\{0}'.format(eachCsvFile), copyToPath)
+                    self.fileMgmtObj.copyFileWindowsToLocalWindows(resultsPath+'\\{0}'.format(eachCsvFile), copyToPath)
                 else:
-                    self.ixnObj.copyFileWindowsToLocalLinux(resultsPath+'\\{0}'.format(eachCsvFile), copyToPath)
+                    self.fileMgmtObj.copyFileWindowsToLocalLinux(resultsPath+'\\{0}'.format(eachCsvFile), copyToPath)
             else:
                 # TODO: Copy from Linux to Windows and Linux to Linux.
                 pass
@@ -330,15 +331,15 @@ class QuickTest(object):
 
             if where == 'localWindows':
                 response = self.ixnObj.get(self.ixnObj.httpHeader+response.json()['url'])
-                self.ixnObj.copyFileWindowsToLocalWindows(response.json()['result'], copyToLocalPath, renameDestinationFile, includeTimestamp)
+                self.fileMgmtObj.copyFileWindowsToLocalWindows(response.json()['result'], copyToLocalPath, renameDestinationFile, includeTimestamp)
             if where == 'remoteWindows':
                 # TODO: Work in progress.  Not sure if this is possible.
                 resultPath = self.getQuickTestResultPath(quickTestHandle)
                 #self.ixnObj.copyFileWindowsToRemoteWindows(response.json()['result'], copyToLocalPath, renameDestinationFile, includeTimestamp)
-                self.ixnObj.copyFileWindowsToRemoteWindows(resultPath, copyToLocalPath, renameDestinationFile, includeTimestamp)
+                self.fileMgmtObj.copyFileWindowsToRemoteWindows(resultPath, copyToLocalPath, renameDestinationFile, includeTimestamp)
             if where == 'remoteLinux':
                 linuxResultPath = self.getQuickTestResultPath(quickTestHandle)
-                self.ixnObj.copyFileWindowsToLocalLinux(linuxResultPath+'\\TestReport.pdf', copyToLocalPath, renameDestinationFile, includeTimestamp)
+                self.fileMgmtObj.copyFileWindowsToLocalLinux(linuxResultPath+'\\TestReport.pdf', copyToLocalPath, renameDestinationFile, includeTimestamp)
         else:
             self.ixnObj.logInfo('\ngetQuickTestPdf failed. Result path = %s' % response.json()['result'])
 

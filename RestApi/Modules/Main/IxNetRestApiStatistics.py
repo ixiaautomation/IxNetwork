@@ -64,6 +64,7 @@ class Statistics(object):
             if silentMode is False:
                 self.ixnObj.logInfo('\ngetStats: Searching for viewObj for viewName: %s' % viewName)
             for view in views:
+                #print('\nview:', view)
                 # GetAttribute
                 response = self.ixnObj.get('%s' % view, silentMode=silentMode)
                 captionMatch = re.match(viewName, response.json()['caption'], re.I)

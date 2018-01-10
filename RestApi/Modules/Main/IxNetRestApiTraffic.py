@@ -653,6 +653,7 @@ class Traffic(object):
 
         self.ixnObj.patch(self.ixnObj.httpHeader+egressStatView, data={'enabled': True})
         self.ixnObj.logInfo('\ncreateEgressCustomStatView: Done')
+
         return egressStatView
 
     def enableTrafficItem(self, trafficItemNumber):
@@ -872,6 +873,7 @@ class Traffic(object):
         """
         self.applyTraffic()
         self.ixnObj.logInfo('\nstartTraffic: %s' % self.ixnObj.sessionUrl+'/traffic/operations/start')
+
         if blocking == False:
             self.ixnObj.post(self.ixnObj.sessionUrl+'/traffic/operations/start', data={'arg1': self.ixnObj.sessionUrl+'/traffic'})
             self.checkTrafficState(expectedState=['started', 'startedWaitingForStats'], timeout=45)
