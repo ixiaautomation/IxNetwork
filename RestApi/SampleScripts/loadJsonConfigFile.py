@@ -14,19 +14,13 @@
 
 import json, sys
 
+sys.path.insert(0, '../Modules/Main')
 from IxNetRestApi import *
 from IxNetRestApiPortMgmt import PortMgmt
 from IxNetRestApiFileMgmt import FileMgmt
 from IxNetRestApiProtocol import Protocol
 from IxNetRestApiTraffic import Traffic
 from IxNetRestApiStatistics import Statistics
-
-jsonConfigFile = '/home/hgee/Dropbox/MyIxiaWork/Rest/classObj/ShellMode/bgp_192.168.70.127.json'
-ixChassisIp = '192.168.70.11'
-
-# [chassisIp, cardNumber, slotNumber]
-portList = [[ixChassisIp, '1', '1'],
-            [ixChassisIp, '2', '1']]
 
 # Default the API server to either windows or linux.
 connectToApiServer = 'windows'
@@ -39,12 +33,22 @@ if len(sys.argv) > 1:
 
 try:
     #---------- Preference Settings --------------
+
+    licenseServerIp = '192.168.70.3'
+    licenseModel = 'subscription'
+    licenseTier = 'tier3'
     forceTakePortOwnership = True
     releasePortsWhenDone = False
     enableDebugTracing = True
+    jsonConfigFile = 'bgp.json'
+    
+    ixChassisIp = '192.168.70.11'
+    # [chassisIp, cardNumber, slotNumber]
+    portList = [[ixChassisIp, '1', '1'],
+                [ixChassisIp, '2', '1']]
 
     if connectToApiServer == 'linux':
-        mainObj = Connect(apiServerIp='192.168.70.144',
+        mainObj = Connect(apiServerIp='192.168.70.108',
                           serverIpPort='443',
                           username='admin',
                           password='admin',
@@ -53,7 +57,7 @@ try:
                           serverOs='linux')
 
     if connectToApiServer in ['windows', 'windowsConnectionMgr']:
-        mainObj = Connect(apiServerIp='192.168.70.127', serverIpPort='11009', serverOs=connectToApiServer)
+        mainObj = Connect(apiServerIp='192.168.70.3', serverIpPort='11009', serverOs=connectToApiServer)
 
     #---------- Preference Settings End --------------
 
@@ -70,7 +74,7 @@ try:
     # Optional: Uncomment if required.
     # Configuring license requires releasing all ports even for ports that is not used for this test.
     portObj.releaseAllPorts()
-    mainObj.configLicenseServerDetails(['192.168.70.127'], 'subscription', 'tier3')
+    mainObj.configLicenseServerDetails([licenseServerIp], licenseModel, licenseTier)
 
     fileMgmtObj = FileMgmt(mainObj)
     jsonData = fileMgmtObj.jsonReadConfig(jsonConfigFile)

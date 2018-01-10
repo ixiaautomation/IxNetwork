@@ -29,6 +29,8 @@
 #    server is newly installed, it configures the one time global license server settings.
 
 import sys, traceback
+
+sys.path.insert(0, '../Modules/Main')
 from IxNetRestApi import *
 from IxNetRestApiPortMgmt import PortMgmt
 from IxNetRestApiFileMgmt import FileMgmt
@@ -50,7 +52,10 @@ try:
     releasePortsWhenDone = False
     enableDebugTracing = True
     deleteSessionAfterTest = True
-    configFile = '/home/hgee/Dropbox/MyIxiaWork/Temp/QuickTestNgpf_vm8.20.ixncfg'
+    licenseServerIp = '192.168.70.3'
+    licenseModel = 'subscription'
+    licenseTier = 'tier3'
+    configFile = 'QuickTestNgpf_vm8.20.ixncfg'
     quickTestNameToRun = 'QuickTest1'
 
     ixChassisIp = '192.168.70.11'
@@ -59,7 +64,7 @@ try:
                 [ixChassisIp, '2', '1']]
 
     if connectToApiServer == 'linux':
-        mainObj = Connect(apiServerIp='192.168.70.144',
+        mainObj = Connect(apiServerIp='192.168.70.108',
                           serverIpPort='443',
                           username='admin',
                           password='admin',
@@ -69,7 +74,7 @@ try:
                           )
 
     if connectToApiServer in ['windows', 'windowsConnectionMgr']:
-        mainObj = Connect(apiServerIp='192.168.70.127',
+        mainObj = Connect(apiServerIp='192.168.70.3',
                           serverIpPort='11009',
                           serverOs=connectToApiServer,
                           deleteSessionAfterTest=deleteSessionAfterTest)
@@ -89,14 +94,14 @@ try:
     # Uncomment this to configure license server.
     # Configuring license requires releasing all ports even for ports that is not used for this test.
     portObj.releaseAllPorts()
-    mainObj.configLicenseServerDetails(['192.168.70.127'], 'mixed', 'tier3')
+    mainObj.configLicenseServerDetails([licenseServerIp], licenseModel, licenseTier)
 
     fileMgmtObj = FileMgmt(mainObj)
     fileMgmtObj.loadConfigFile(configFile)
     portObj.assignPorts(portList, createVports=False)
     portObj.verifyPortState()
 
-    quickTestObj = QuickTest(mainObj) 
+    quickTestObj = QuickTest(mainObj, fileMgmtObj) 
     quickTestHandle = quickTestObj.getQuickTestHandleByName(quickTestNameToRun)
     print('\nQuickTest Handle:', quickTestHandle)
 

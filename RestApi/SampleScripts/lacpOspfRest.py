@@ -27,6 +27,8 @@
 #    python <script>.py linux
 
 import sys, traceback
+
+sys.path.insert(0, '../Modules/Main')
 from IxNetRestApi import *
 from IxNetRestApiPortMgmt import PortMgmt
 from IxNetRestApiTraffic import Traffic
@@ -48,6 +50,9 @@ try:
     releasePortsWhenDone = False
     enableDebugTracing = True
     deleteSessionAfterTest = True ;# For Windows Connection Mgr and Linux API server only
+    licenseServerIp = '192.168.70.3'
+    licenseModel = 'subscription'
+    licenseTier = 'tier3'
 
     ixChassisIp = '192.168.70.11'
     # [chassisIp, cardNumber, slotNumber]
@@ -55,7 +60,7 @@ try:
                [ixChassisIp, '2', '1']]
 
     if connectToApiServer == 'linux':
-        mainObj = Connect(apiServerIp='192.168.70.144',
+        mainObj = Connect(apiServerIp='192.168.70.108',
                           serverIpPort='443',
                           username='admin',
                           password='admin',
@@ -64,7 +69,7 @@ try:
                           serverOs=connectToApiServer)
 
     if connectToApiServer in ['windows', 'windowsConnectionMgr']:
-        mainObj = Connect(apiServerIp='192.168.70.127',
+        mainObj = Connect(apiServerIp='192.168.70.3',
                           serverIpPort='11009',
                           serverOs=connectToApiServer,
                           deleteSessionAfterTest=deleteSessionAfterTest)
@@ -80,7 +85,7 @@ try:
         else:
             raise IxNetRestApiException('Ports are owned by another user and forceTakePortOwnership is set to False')
 
-    mainObj.configLicenseServerDetails(['192.168.70.127'], 'subscription', 'tier3')
+    mainObj.configLicenseServerDetails([licenseServerIp], licenseModel, licenseTier)
     mainObj.newBlankConfig()
 
     # Set createVports True if building config from scratch.

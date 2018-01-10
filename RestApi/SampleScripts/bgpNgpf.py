@@ -5,126 +5,55 @@
 #    It is subject to change for content updates without warning.
 #
 # REQUIREMENTS
-#    - Python2.7/3.4
+#    - Python2.7
 #    - Python modules: requests
 #
 # DESCRIPTION
 #    This sample script demonstrates:
 #        - REST API configurations using two back-to-back Ixia ports.
 #        - Connecting to Windows IxNetwork API server or Linux API server.
-
-#    Configures custom egress tracking on a receiving port.
 #
-#    This sample shows how to create one ingress tracking and one egress tracking
-#    so the configuration tries not to run out of the maximum 22 bits of resource.
+#        - Verify for sufficient amount of port licenses before testing.
+#        - Verify port ownership.
+#        - Configure two IPv4/BGP Topology Groups
+#        - Start protocols
+#        - Verify BGP protocol sessions
+#        - Create a Traffic Item
+#        - Apply Traffic
+#        - Start Traffic
+#        - Get stats
 #
-#    This script supports both IxNetwork API server and Linux API server connection.
-#
-#    - Configure two IPv4 Topology Groups
-#    - Start protocols
-#    - Create Traffic Item
-#    - Regenerate All Traffic Items
-#    - Apply Traffic
-#    - Configures egress tracking
-#    - Create egress tracking stat view
-#    - Start Traffic
-#    - Get stats
-#    - Option to remove the egress stat view
-#
-# To include an ingress tracking field:
-#    When you create your Traffic Item, this is when you select your ingress trackings.
-#    The ingress trackings becomes an option for you to select as part of the egress tracking
-#    stats as shown below.
-#
-# Available tracking filters for both ingress and egress...
-#        ID: 1  VLAN:VLAN-ID (Ingress tracking)
-#        ID: 2  Flow Group  (Ingress tracking)
-#        ID: 3  Custom: (4 bits at offset 116)  <-- Egress tracking
-#
-# Sample egress stats:
-#
-# Row: 1
-#        Rx Port: 2/1
-#        VLAN:VLAN-ID: 103  <-- Ingress tracking the vlanID
-#        Egress Tracking: Custom: (4 bits at offset 116)
-#        Tx Frames: 100000
-#        Rx Frames: 100000
-#        Frames Delta: 0
-#        Loss %: 0
-#        Tx Frame Rate: 0
-#        Rx Frame Rate: 0
-#        Tx L1 Rate (bps): 0
-#        Rx L1 Rate (bps): 0
-#        Rx Bytes: 12800000
-#        Tx Rate (Bps): 0
-#        Rx Rate (Bps): 0
-#        Tx Rate (bps): 0
-#        Rx Rate (bps): 0
-#        Tx Rate (Kbps): 0
-#        Rx Rate (Kbps): 0
-#        Tx Rate (Mbps): 0
-#        Rx Rate (Mbps): 0
-#        Store-Forward Avg Latency (ns): 556418835
-#        Store-Forward Min Latency (ns): 9840
-#        Store-Forward Max Latency (ns): 1213352620
-#        First TimeStamp: 00:00:01.002
-#        Last TimeStamp: 00:00:02.510
+# USAGE
+#    python <script>.py windows
+#    python <script>.py linux
 
 import sys, traceback
+
+sys.path.insert(0, '../Modules/Main')
 from IxNetRestApi import *
 from IxNetRestApiPortMgmt import PortMgmt
-from IxNetRestApiProtocol import Protocol
 from IxNetRestApiTraffic import Traffic
+from IxNetRestApiProtocol import Protocol
 from IxNetRestApiStatistics import Statistics
- 
+
 # Default the API server to either windows or linux.
 connectToApiServer = 'windows'
 
 if len(sys.argv) > 1:
-    if sys.argv[1] not in ['windows', 'linux']:
+    if sys.argv[1] not in ['windows', 'windowsConnectionMgr', 'linux']:
         sys.exit("\nError: %s is not a known option. Choices are 'windows' or 'linux'." % sys.argv[1])
     connectToApiServer = sys.argv[1]
 
-#--------------- Egress tracking variable settings -----------------
-# STEP 1:
-#    This variable is optional for you to name your egress stat view.
-#    Defaults to EgressStatView
-egressStatViewName = 'EgressStats'
-
-# STEP 2:
-#    Modify this variable's value using your chassisIp,card#/port# in this string's format.
-egressTrackingPort = '192.168.70.11/Card2/Port1'
-offsetBit = 116
-bitWidth = 4
-
-# STEP 3:
-# This variable is optional to include an ingress tracking field. Set to None if you don't want to
-# track ingressing packets.
-# This ingress tracking filter name will be selectable only if you include it in the Traffic Item's
-# trackby parameter at the time of creating the Traffic Item.
-# How to know and get the filter name?
-#     - Include the tracking on Traffic Item first.
-#     - Then run this script with this variable set to None since you don't know the filter name yet.
-#     - On your terminal, you will see a list of tracking filter names like shown below:
-#
-#        ID: 1  VLAN:VLAN-ID  <-- For this example, going to track ingressing vlanID.
-#        ID: 2  Flow Group
-#        ID: 3  Custom: (4 bits at offset 116)  <-- This is your custom egress tracking filter name.
-ingressTrackingFilterName = 'VLAN:VLAN-ID'
-#ingressTrackingFilterName = None
-
-# STEP 4:
-# Sometime you might not want to remove the created egress stat view so you could debug.
-removeAllTclStatViews = True
-
-#--------------- Egress tracking variable settings ends ----------
-
 try:
     #---------- Preference Settings --------------
+
     forceTakePortOwnership = True
     releasePortsWhenDone = False
     enableDebugTracing = True
     deleteSessionAfterTest = True ;# For Windows Connection Mgr and Linux API server only
+    licenseServerIp = '192.168.70.3'
+    licenseModel = 'subscription'
+    licenseTier = 'tier3'
 
     ixChassisIp = '192.168.70.11'
     # [chassisIp, cardNumber, slotNumber]
@@ -132,18 +61,21 @@ try:
                 [ixChassisIp, '2', '1']]
 
     if connectToApiServer == 'linux':
-        mainObj = Connect(apiServerIp='192.168.70.144',
+        mainObj = Connect(apiServerIp='192.168.70.108',
+                          serverIpPort='443',
                           username='admin',
                           password='admin',
                           deleteSessionAfterTest=deleteSessionAfterTest,
                           verifySslCert=False,
-                          serverOs=connectToApiServer)
+                          serverOs=connectToApiServer
+                          )
 
     if connectToApiServer in ['windows', 'windowsConnectionMgr']:
-        mainObj = Connect(apiServerIp='192.168.70.127',
+        mainObj = Connect(apiServerIp='192.168.70.3',
                           serverIpPort='11009',
                           serverOs=connectToApiServer,
-                          deleteSessionAfterTest=deleteSessionAfterTest)
+                          deleteSessionAfterTest=deleteSessionAfterTest
+                          )
 
     #---------- Preference Settings End --------------
 
@@ -157,14 +89,13 @@ try:
         else:
             raise IxNetRestApiException('Ports are owned by another user and forceTakePortOwnership is set to False')
 
-    # Uncomment this to configure license server.
     # Configuring license requires releasing all ports even for ports that is not used for this test.
-    #mainObj.releaseAllPorts()
-    #mainObj.configLicenseServerDetails(['192.168.70.127'], 'mixed', 'tier3')
+    portObj.releaseAllPorts()
+    mainObj.configLicenseServerDetails([licenseServerIp], licenseModel, licenseTier)
 
     mainObj.newBlankConfig()
 
-    # Set createVports True if building config from scratch.
+    # Set createVports = True if building config from scratch.
     portObj.assignPorts(portList, createVports=True)
 
     protocolObj = Protocol(mainObj, portObj)
@@ -197,11 +128,11 @@ try:
                                                   macAddress={'start': '00:01:02:00:00:01',
                                                               'direction': 'increment',
                                                               'step': '00:00:00:00:00:01'},
+                                                  macAddressPortStep='disabled',
                                                   vlanId={'start': 103,
                                                           'direction': 'increment',
-                                                          'step':0},
-                                                  macAddressPortStep='disabled')
-
+                                                          'step':0})
+    
     ipv4Obj1 = protocolObj.createIpv4Ngpf(ethernetObj1,
                                           ipv4Address={'start': '1.1.1.1',
                                                        'direction': 'increment',
@@ -220,71 +151,114 @@ try:
                                                        'step': '0.0.0.1'},
                                           ipv4AddressPortStep='disabled',
                                           gateway={'start': '1.1.1.1',
-                                                   'direction':'increment',
+                                                   'direction': 'increment',
                                                    'step': '0.0.0.0'},
                                           gatewayPortStep='disabled',
                                           prefix=24,
                                           resolveGateway=True)
     
+    # flap = true or false.
+    #    If there is only one host IP interface, then single value = True or False.
+    #    If there are multiple host IP interfaces, then single value = a list ['true', 'false']
+    #           Provide a list of total true or false according to the total amount of host IP interfaces.
+    bgpObj1 = protocolObj.configBgp(ipv4Obj1,
+                                    name = 'bgp_1',
+                                    enableBgp = True,
+                                    holdTimer = 90,
+                                    dutIp={'start': '1.1.1.2',
+                                           'direction': 'increment',
+                                           'step': '0.0.0.0'},
+                                    localAs2Bytes = 101,
+                                    enableGracefulRestart = False,
+                                    restartTime = 45,
+                                    type = 'internal',
+                                    enableBgpIdSameasRouterId = True,
+                                    staleTime = 0,
+                                    flap = False)
+    
+    bgpObj2 = protocolObj.configBgp(ipv4Obj2,
+                                    name = 'bgp_2',
+                                    enableBgp = True,
+                                    holdTimer = 90,
+                                    dutIp={'start': '1.1.1.1',
+                                           'direction': 'increment',
+                                           'step': '0.0.0.0'},
+                                    localAs2Bytes = 101,
+                                    enableGracefulRestart = False,
+                                    restartTime = 45,
+                                    type = 'internal',
+                                    enableBgpIdSameasRouterId = True,
+                                    staleTime = 0,
+                                    flap = False)
+    
+    networkGroupObj1 = protocolObj.configNetworkGroup(create=deviceGroupObj1,
+                                                      name='networkGroup1',
+                                                      multiplier = 100,
+                                                      networkAddress = {'start': '160.1.0.0',
+                                                                        'step': '0.0.0.1',
+                                                                        'direction': 'increment'},
+                                                      prefixLength = 32)
+    
+    networkGroupObj2 = protocolObj.configNetworkGroup(create=deviceGroupObj2,
+                                                  name='networkGroup2',
+                                                  multiplier = 100,
+                                                  networkAddress = {'start': '180.1.0.0',
+                                                                    'step': '0.0.0.1',
+                                                                    'direction': 'increment'},
+                                                  prefixLength = 32)
+
     protocolObj.startAllProtocols()
     protocolObj.verifyProtocolSessionsNgpf()
-    
-    # For all parameter options, please go to the API configTrafficItem
+
+    # For all parameter options, go to the API configTrafficItem.
     # mode = create or modify
     trafficObj = Traffic(mainObj)
-    trafficStatus = trafficObj.configTrafficItem(mode='create',
-                                                 trafficItem = {
-                                                     'name':'Topo1 to Topo2',
-                                                     'trafficType':'ipv4',
-                                                     'biDirectional':True,
-                                                     'srcDestMesh':'one-to-one',
-                                                     'routeMesh':'oneToOne',
-                                                     'allowSelfDestined':False,
-                                                     'trackBy': ['flowGroup0', 'vlanVlanId0', 'sourceDestValuePair0']},
-                                                 endpoints = [({'name':'Flow-Group-1',
-                                                                'sources': [topologyObj1],
-                                                                'destinations': [topologyObj2]},
-                                                               {'highLevelStreamElements': None})],
-                                                 configElements = [{'transmissionType': 'fixedFrameCount',
-                                                                    'frameCount': 100000,
-                                                                    'frameRate': 88,
-                                                                    'frameRateType': 'percentLineRate',
-                                                                    'frameSize': 128}])
+    trafficStatus = trafficObj.configTrafficItem(
+        mode='create',
+        trafficItem = {
+            'name':'Topo1 to Topo2',
+            'trafficType':'ipv4',
+            'biDirectional':True,
+            'srcDestMesh':'one-to-one',
+            'routeMesh':'oneToOne',
+            'allowSelfDestined':False,
+            'trackBy': ['flowGroup0', 'vlanVlanId0']},
+
+        endpoints = [({'name':'Flow-Group-1', 'sources': [topologyObj1], 'destinations': [topologyObj2]}, {'highLevelStreamElements': None})],
+
+        configElements = [{'transmissionType': 'fixedFrameCount',
+                           'frameCount': 50000,
+                           'frameRate': 88,
+                           'frameRateType': 'percentLineRate',
+                           'frameSize': 128}])
     
     trafficItemObj   = trafficStatus[0]
     endpointObj      = trafficStatus[1][0]
     configElementObj = trafficStatus[2][0]
-    
+
     trafficObj.regenerateTrafficItems()
-    trafficObj.applyTraffic()
-    trafficObj.configEgressCustomTracking(trafficItemObj, offsetBit, bitWidth)
-    trafficObj.createEgressStatView(trafficItemObj, egressTrackingPort, offsetBit, bitWidth,
-                                    egressStatViewName, ingressTrackingFilterName)
-    
     trafficObj.startTraffic()
-    
-    # Check the traffic state to assure traffic has indeed stopped before checking for stats.
+
+    # Check the traffic state to assure traffic has stopped before checking for stats.
     if trafficObj.getTransmissionType(configElementObj) == "fixedFrameCount":
         trafficObj.checkTrafficState(expectedState=['stopped', 'stoppedWaitingForStats'], timeout=45)
-    
+
     statObj = Statistics(mainObj)
-    stats = statObj.getStats(viewName=egressStatViewName)
-        
-    #if removeAllTclStatViews:
-    #    mainObj.removeAllTclViews()
-    
-    print('{0:10} {1:15} {2:15}'.format(
-        'rxPort', 'txFrames', 'rxFrames'))
+    stats = statObj.getStats(viewName='Flow Statistics', silentMode=False)
+
+    print('\n{txPort:10} {txFrames:15} {rxPort:10} {rxFrames:15} {frameLoss:10}'.format(
+        txPort='txPort', txFrames='txFrames', rxPort='rxPort', rxFrames='rxFrames', frameLoss='frameLoss'))
     print('-'*90)
 
     for flowGroup,values in stats.items():
+        txPort = values['Tx Port']
         rxPort = values['Rx Port']
         txFrames = values['Tx Frames']
         rxFrames = values['Rx Frames']
         frameLoss = values['Frames Delta']
 
-        print('{rxPort:10} {txFrames:15} {rxFrames:15}'.format(
-            rxPort=rxPort, txFrames=txFrames, rxFrames=rxFrames))
+        print('{txPort:10} {txFrames:15} {rxPort:10} {rxFrames:15} {frameLoss:10} '.format(
+            txPort=txPort, txFrames=txFrames, rxPort=rxPort, rxFrames=rxFrames, frameLoss=frameLoss))
 
     if releasePortsWhenDone == True:
         portObj.releasePorts(portList)
@@ -302,6 +276,8 @@ except (IxNetRestApiException, Exception, KeyboardInterrupt) as errMsg:
     print('\nException Error! %s\n' % errMsg)
     if 'mainObj' in locals() and connectToApiServer == 'linux':
         mainObj.linuxServerStopAndDeleteSession()
-    if 'mainObj' in locals() and connectToApiServer == 'windows':
+    if 'mainObj' in locals() and connectToApiServer in ['windows', 'windowsConnectionMgr']:
         if releasePortsWhenDone and forceTakePortOwnership:
             portObj.releasePorts(portList)
+        if connectToApiServer == 'windowsConnectionMgr':
+            mainObj.deleteSession()

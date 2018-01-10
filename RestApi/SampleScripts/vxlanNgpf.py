@@ -13,11 +13,9 @@
 #        - REST API configurations using two back-to-back Ixia ports.
 #        - Connecting to Windows IxNetwork API server or Linux API server.
 #
-#        - Verify for sufficient amount of port licenses before testing.
-#        - Verify port ownership.
-#        - Configure two IPv4/BGP Topology Groups
+#        - Configure two IPv4 Topology Groups
 #        - Start protocols
-#        - Verify BGP protocol sessions
+#        - Verify ARP
 #        - Create a Traffic Item
 #        - Apply Traffic
 #        - Start Traffic
@@ -28,6 +26,8 @@
 #    python <script>.py linux
 
 import sys, traceback
+
+sys.path.insert(0, '../Modules/Main')
 from IxNetRestApi import *
 from IxNetRestApiPortMgmt import PortMgmt
 from IxNetRestApiTraffic import Traffic
@@ -39,7 +39,7 @@ connectToApiServer = 'windows'
 
 if len(sys.argv) > 1:
     if sys.argv[1] not in ['windows', 'windowsConnectionMgr', 'linux']:
-        sys.exit("\nError: %s is not a known option. Choices are 'windows' or 'linux'." % sys.argv[1])
+        sys.exit("\nError: %s is not a known option. Choices are 'windows', 'windowsConnectionMgr or 'linux'." % sys.argv[1])
     connectToApiServer = sys.argv[1]
 
 try:
@@ -49,6 +49,9 @@ try:
     releasePortsWhenDone = False
     enableDebugTracing = True
     deleteSessionAfterTest = True ;# For Windows Connection Mgr and Linux API server only
+    licenseServerIp = '192.168.70.3'
+    licenseModel = 'subscription'
+    licenseTier = 'tier3'
 
     ixChassisIp = '192.168.70.11'
     # [chassisIp, cardNumber, slotNumber]
@@ -56,22 +59,19 @@ try:
                 [ixChassisIp, '2', '1']]
 
     if connectToApiServer == 'linux':
-        mainObj = Connect(apiServerIp='192.168.70.144',
-                          serverIpPort='443',
+        mainObj = Connect(apiServerIp='192.168.70.108',
                           username='admin',
                           password='admin',
                           deleteSessionAfterTest=deleteSessionAfterTest,
                           verifySslCert=False,
-                          serverOs=connectToApiServer
-                          )
-
+                          serverOs=connectToApiServer)
+        
     if connectToApiServer in ['windows', 'windowsConnectionMgr']:
-        mainObj = Connect(apiServerIp='192.168.70.127',
+        mainObj = Connect(apiServerIp='192.168.70.3',
                           serverIpPort='11009',
                           serverOs=connectToApiServer,
-                          deleteSessionAfterTest=deleteSessionAfterTest
-                          )
-
+                          deleteSessionAfterTest=deleteSessionAfterTest)
+        
     #---------- Preference Settings End --------------
 
     portObj = PortMgmt(mainObj)
@@ -84,13 +84,14 @@ try:
         else:
             raise IxNetRestApiException('Ports are owned by another user and forceTakePortOwnership is set to False')
 
+    # Uncomment this to configure license server.
     # Configuring license requires releasing all ports even for ports that is not used for this test.
     portObj.releaseAllPorts()
-    mainObj.configLicenseServerDetails(['192.168.70.127'], 'subscription', 'tier3')
+    mainObj.configLicenseServerDetails([licenseServerIp], licenseModel, licenseTier)
 
     mainObj.newBlankConfig()
 
-    # Set createVports = True if building config from scratch.
+    # Set createVports True if building config from scratch.
     portObj.assignPorts(portList, createVports=True)
 
     protocolObj = Protocol(mainObj, portObj)
@@ -114,9 +115,7 @@ try:
                                                               'direction': 'increment',
                                                               'step': '00:00:00:00:00:01'},
                                                   macAddressPortStep='disabled',
-                                                  vlanId={'start': 103,
-                                                          'direction': 'increment',
-                                                          'step':0})
+                                                  vlanId=100)
     
     ethernetObj2 = protocolObj.createEthernetNgpf(deviceGroupObj2,
                                                   ethernetName='MyEth2',
@@ -124,88 +123,94 @@ try:
                                                               'direction': 'increment',
                                                               'step': '00:00:00:00:00:01'},
                                                   macAddressPortStep='disabled',
-                                                  vlanId={'start': 103,
-                                                          'direction': 'increment',
-                                                          'step':0})
+                                                  vlanId=100)
     
     ipv4Obj1 = protocolObj.createIpv4Ngpf(ethernetObj1,
-                                          ipv4Address={'start': '1.1.1.1',
+                                          ipv4Address={'start': '100.1.1.1',
                                                        'direction': 'increment',
                                                        'step': '0.0.0.1'},
                                           ipv4AddressPortStep='disabled',
-                                          gateway={'start': '1.1.1.2',
+                                          gateway={'start': '100.1.3.1',
                                                    'direction': 'increment',
-                                                   'step': '0.0.0.0'},
+                                                   'step': '0.0.0.1'},
                                           gatewayPortStep='disabled',
-                                          prefix=24,
+                                          prefix=16,
                                           resolveGateway=True)
     
     ipv4Obj2 = protocolObj.createIpv4Ngpf(ethernetObj2,
-                                          ipv4Address={'start': '1.1.1.2',
+                                          ipv4Address={'start': '100.1.3.1',
                                                        'direction': 'increment',
                                                        'step': '0.0.0.1'},
                                           ipv4AddressPortStep='disabled',
-                                          gateway={'start': '1.1.1.1',
+                                          gateway={'start': '100.1.1.1',
                                                    'direction': 'increment',
-                                                   'step': '0.0.0.0'},
+                                                   'step': '0.0.0.1'},
                                           gatewayPortStep='disabled',
-                                          prefix=24,
+                                          prefix=16,
                                           resolveGateway=True)
     
-    # flap = true or false.
-    #    If there is only one host IP interface, then single value = True or False.
-    #    If there are multiple host IP interfaces, then single value = a list ['true', 'false']
-    #           Provide a list of total true or false according to the total amount of host IP interfaces.
-    bgpObj1 = protocolObj.configBgp(ipv4Obj1,
-                                    name = 'bgp_1',
-                                    enableBgp = True,
-                                    holdTimer = 90,
-                                    dutIp={'start': '1.1.1.2',
-                                           'direction': 'increment',
-                                           'step': '0.0.0.0'},
-                                    localAs2Bytes = 101,
-                                    enableGracefulRestart = False,
-                                    restartTime = 45,
-                                    type = 'internal',
-                                    enableBgpIdSameasRouterId = True,
-                                    staleTime = 0,
-                                    flap = False)
+    vxlanObj1 = protocolObj.configVxlanNgpf(ipv4Obj1,
+                                            vtepName='vtep_1',
+                                            vtepVni={'start':1008,
+                                                     'step':2,
+                                                     'direction':'increment'},
+                                            vtepIpv4Multicast={'start':'225.8.0.1',
+                                                               'step':'0.0.0.1',
+                                                               'direction':'increment'})
     
-    bgpObj2 = protocolObj.configBgp(ipv4Obj2,
-                                    name = 'bgp_2',
-                                    enableBgp = True,
-                                    holdTimer = 90,
-                                    dutIp={'start': '1.1.1.1',
-                                           'direction': 'increment',
-                                           'step': '0.0.0.0'},
-                                    localAs2Bytes = 101,
-                                    enableGracefulRestart = False,
-                                    restartTime = 45,
-                                    type = 'internal',
-                                    enableBgpIdSameasRouterId = True,
-                                    staleTime = 0,
-                                    flap = False)
     
-    networkGroupObj1 = protocolObj.configNetworkGroup(create=deviceGroupObj1,
-                                                      name='networkGroup1',
-                                                      multiplier = 100,
-                                                      networkAddress = {'start': '160.1.0.0',
-                                                                        'step': '0.0.0.1',
-                                                                        'direction': 'increment'},
-                                                      prefixLength = 32)
+    vxlanObj2 = protocolObj.configVxlanNgpf(ipv4Obj2,
+                                            vtepName='vtep_2',
+                                            vtepVni={'start':1008,
+                                                     'step':2,
+                                                     'direction':'increment'},
+                                            vtepIpv4Multicast={'start':'225.8.0.1',
+                                                               'step':'0.0.0.1',
+                                                               'direction':'increment'})
     
-    networkGroupObj2 = protocolObj.configNetworkGroup(create=deviceGroupObj2,
-                                                  name='networkGroup2',
-                                                  multiplier = 100,
-                                                  networkAddress = {'start': '180.1.0.0',
-                                                                    'step': '0.0.0.1',
-                                                                    'direction': 'increment'},
-                                                  prefixLength = 32)
-
+    vxlanDeviceGroupObj1 = protocolObj.createDeviceGroupNgpf(deviceGroupObj1,
+                                                             multiplier=3, deviceGroupName='vxlanHost1')
+    
+    vxlanEthernetObj1 = protocolObj.createEthernetNgpf(vxlanDeviceGroupObj1,
+                                                       ethernetName='VxLan1-Eth1',
+                                                       macAddress={'start': '00:01:11:00:00:01',
+                                                                   'direction': 'increment',
+                                                                   'step': '00:00:00:00:00:01'},
+                                                       vlanId='101')
+    
+    vxlanIpv4Obj1 = protocolObj.createIpv4Ngpf(vxlanEthernetObj1,
+                                               ipv4Address={'start': '10.1.1.1',
+                                                            'step': '0.0.0.0',
+                                                            'direction': 'increment'},
+                                               gateway={'start': '10.1.3.1',
+                                                        'step': '0.0.0.0',
+                                                        'direction': 'increment'},
+                                               prefix=16,
+                                               resolveGateway=True)
+    
+    vxlanDeviceGroupObj2 = protocolObj.createDeviceGroupNgpf(deviceGroupObj2, multiplier=3, deviceGroupName='vxlanHost2')
+    
+    vxlanEthernetObj2 = protocolObj.createEthernetNgpf(vxlanDeviceGroupObj2,
+                                                       ethernetName='VxLan1-Eth1',
+                                                       macAddress={'start': '00:01:22:00:00:01',
+                                                                   'direction': 'increment',
+                                                                   'step': '00:00:00:00:00:01'},
+                                                       vlanId='101')
+    
+    vxlanIpv4Obj2 = protocolObj.createIpv4Ngpf(vxlanEthernetObj2,
+                                               ipv4Address={'start': '10.1.3.1',
+                                                            'step': '0.0.0.0',
+                                                            'direction': 'increment'},
+                                               gateway={'start': '10.1.1.1',
+                                                        'step': '0.0.0.0',
+                                                        'direction': 'increment'},
+                                               prefix=16,
+                                               resolveGateway=True)
+    
     protocolObj.startAllProtocols()
     protocolObj.verifyProtocolSessionsNgpf()
-
-    # For all parameter options, go to the API configTrafficItem.
+    
+    # For all parameter options, please go to the API configTrafficItem
     # mode = create or modify
     trafficObj = Traffic(mainObj)
     trafficStatus = trafficObj.configTrafficItem(
@@ -217,10 +222,11 @@ try:
             'srcDestMesh':'one-to-one',
             'routeMesh':'oneToOne',
             'allowSelfDestined':False,
-            'trackBy': ['flowGroup0', 'vlanVlanId0']},
-
-        endpoints = [({'name':'Flow-Group-1', 'sources': [topologyObj1], 'destinations': [topologyObj2]}, {'highLevelStreamElements': None})],
-
+            'trackBy': ['flowGroup0']},
+        endpoints = [({'name':'Flow-Group-1',
+                       'sources': [vxlanIpv4Obj1],
+                       'destinations': [vxlanIpv4Obj2]},
+                      {'highLevelStreamElements': None})],
         configElements = [{'transmissionType': 'fixedFrameCount',
                            'frameCount': 50000,
                            'frameRate': 88,
@@ -234,12 +240,12 @@ try:
     trafficObj.regenerateTrafficItems()
     trafficObj.startTraffic()
 
-    # Check the traffic state to assure traffic has stopped before checking for stats.
+    # Check the traffic state to assure traffic has indeed stopped before checking for stats.
     if trafficObj.getTransmissionType(configElementObj) == "fixedFrameCount":
-        trafficObj.checkTrafficState(expectedState=['stopped', 'stoppedWaitingForStats'], timeout=45)
+        trafficObj.checkTrafficState(expectedState=['stopped', 'stoppedWaitingForStats'], timeout=140)
 
     statObj = Statistics(mainObj)
-    stats = statObj.getStats(viewName='Flow Statistics', silentMode=False)
+    stats = statObj.getStats(viewName='Flow Statistics')
 
     print('\n{txPort:10} {txFrames:15} {rxPort:10} {rxFrames:15} {frameLoss:10}'.format(
         txPort='txPort', txFrames='txFrames', rxPort='rxPort', rxFrames='rxFrames', frameLoss='frameLoss'))

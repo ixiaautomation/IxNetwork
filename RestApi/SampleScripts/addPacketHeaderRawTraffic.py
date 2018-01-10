@@ -38,6 +38,8 @@
 #        - IxVM ports
 
 import sys, traceback
+
+sys.path.insert(0, '../Modules/Main')
 from IxNetRestApi import *
 from IxNetRestApiPortMgmt import PortMgmt
 from IxNetRestApiTraffic import Traffic
@@ -58,19 +60,17 @@ try:
     releasePortsWhenDone = False
     enableDebugTracing = True
     deleteSessionAfterTest = True ;# For Windows Connection Mgr and Linux API server only
+    licenseServerIp = '192.168.70.3'
+    licenseModel = 'subscription'
+    licenseTier = 'tier3'
 
     ixChassisIp = '192.168.70.11'
     # [chassisIp, cardNumber, slotNumber]
     portList = [[ixChassisIp, '1', '1'],
                 [ixChassisIp, '2', '1']]
 
-    # ixChassisIp = '10.220.114.34'
-    # # [chassisIp, cardNumber, slotNumber]
-    # portList = [[ixChassisIp, '1', '1'],
-    #             [ixChassisIp, '1', '2']]
-
     if connectToApiServer == 'linux':
-        mainObj = Connect(apiServerIp='192.168.70.144',
+        mainObj = Connect(apiServerIp='192.168.70.108',
                           serverIpPort='443',
                           username='admin',
                           password='admin',
@@ -79,7 +79,7 @@ try:
                           serverOs=connectToApiServer)
 
     if connectToApiServer in ['windows', 'windowsConnectionMgr']:
-        mainObj = Connect(apiServerIp='192.168.70.127',
+        mainObj = Connect(apiServerIp='192.168.70.3',
                           serverIpPort='11009',
                           serverOs=connectToApiServer,
                           deleteSessionAfterTest=deleteSessionAfterTest)
@@ -99,7 +99,7 @@ try:
     # Uncomment this to configure license server.
     # Configuring license requires releasing all ports even for ports that is not used for this test.
     portObj.releaseAllPorts()
-    mainObj.configLicenseServerDetails(['192.168.70.127'], 'mixed', 'tier3')
+    mainObj.configLicenseServerDetails([licenseServerIp], licenseModel, licenseTier)
 
     mainObj.newBlankConfig()
 
@@ -109,19 +109,21 @@ try:
     # For all parameter options, please go to the API configTrafficItem
     # mode = create or modify
     trafficObj = Traffic(mainObj)
-    trafficStatus = trafficObj.configTrafficItem(mode='create',
-                                                 trafficItem = {
-                                                     'name':'Raw MPLS/UDP',
-                                                     'trafficType':'raw',
-                                                     'trackBy': ['flowGroup0']},
-                                                 endpoints = [{'name':'Flow-Group-1',
-                                                               'sources': [vportList[0]],
-                                                               'destinations': [vportList[1]]}],
-                                                 configElements = [{'transmissionType': 'fixedFrameCount',
-                                                                    'frameCount': 50000,
-                                                                    'frameRate': 88,
-                                                                    'frameRateType': 'percentLineRate',
-                                                                    'frameSize': 128}])
+    trafficStatus = trafficObj.configTrafficItem(
+        mode='create',
+        trafficItem = {
+            'name':'Raw MPLS/UDP',
+            'trafficType':'raw',
+            'trackBy': ['flowGroup0']},
+        endpoints = [({'name':'Flow-Group-1',
+                       'sources': [vportList[0]],
+                       'destinations': [vportList[1]]},
+                      {'highLevelStreamElements': None})],
+        configElements = [{'transmissionType': 'fixedFrameCount',
+                           'frameCount': 50000,
+                           'frameRate': 88,
+                           'frameRateType': 'percentLineRate',
+                           'frameSize': 128}])
     
     trafficItem1Obj  = trafficStatus[0]
     endpointObj      = trafficStatus[1][0]
