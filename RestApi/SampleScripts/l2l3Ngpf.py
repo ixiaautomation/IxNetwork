@@ -55,13 +55,21 @@ try:
     licenseModel = 'subscription'
     licenseTier = 'tier3'
 
+    '''
     ixChassisIp = '192.168.70.11'
     # [chassisIp, cardNumber, slotNumber]
     portList = [[ixChassisIp, '1', '1'],
                 [ixChassisIp, '2', '1']]
 
+    '''
+
+    ixChassisIp = '10.219.116.93'
+    # [chassisIp, cardNumber, slotNumber]
+    portList = [[ixChassisIp, '1', '1'],
+                [ixChassisIp, '1', '2']]
+
     if connectToApiServer == 'linux':
-        mainObj = Connect(apiServerIp='192.168.70.108',
+        mainObj = Connect(apiServerIp='10.219.116.93',
                           username='admin',
                           password='admin',
                           deleteSessionAfterTest=deleteSessionAfterTest,

@@ -449,7 +449,10 @@ class Connect(object):
             url = 'https://{0}/api/v1/auth/session'.format(linuxServerIp)
             self.logInfo('\nconnectToLinuxApiServer: %s' % url)
             response = self.post(url, data={'username': username, 'password': password}, ignoreError=True)
-            if not re.match('2[0-9][0-9]', str(response.status_code)):
+            print('\n---- connecctToLinuxApiServer status 1:', response.status_code)
+            print('\n---- connectToLinuxApiServer response 1:', response.json())
+            if not str(response.status_code).startswith('2'):
+            #if not re.match('2[0-9][0-9]', str(response.status_code)):
                 raise IxNetRestApiException('\nLogin username/password failed\n')
             self.apiKey = response.json()['apiKey']
 
@@ -462,6 +465,10 @@ class Connect(object):
             self.jsonHeader = {'content-type': 'application/json', 'x-api-key': self.apiKey}
             self.logInfo('\nlinuxServerCreateSession')
             response = self.post(url, data=data, headers=self.jsonHeader)
+            print('\n---- connecctToLinuxApiServer status 2:', response.status_code)
+            print('\n---- connectToLinuxApiServer response 2:', response.json())
+
+
             sessionId = response.json()['id']
             self.sessionId = 'https://{0}/api/v1/sessions/{1}'.format(linuxServerIp, sessionId)
             self.sessionUrl = 'https://{0}/api/v1/sessions/{1}/ixnetwork'.format(linuxServerIp, sessionId)
@@ -470,6 +477,9 @@ class Connect(object):
             # 3: Start the new session
             self.logInfo('\nlinuxServerStartSession: %s' % self.sessionId)
             response = self.post(self.sessionId+'/operations/start')
+            print('\n---- connecctToLinuxApiServer status 3:', response.status_code)
+            print('\n---- connectToLinuxApiServer response 3:', response.json())
+
             if self.linuxServerWaitForSuccess(response.json()['url'], timeout=60) == 1:
                 raise IxNetRestApiException
 
